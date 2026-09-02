@@ -40,6 +40,11 @@ NEX_X402_BASE = os.environ.get("NEX_X402_BASE", "https://charm-preparing-avon-ip
 NEX_WALLET = "0x28F3D3fb24D4926BF5C35296c822d2a43D181177"
 NEX_COMPANY = "NEX Agent Co."
 
+# State file for saving user chat IDs (so the monitor can DM them about revenue)
+USERS_FILE = "/Users/neilhristov/Code/agents-co/state/telegram-users.json"
+import os as _os
+_os.makedirs(_os.path.dirname(USERS_FILE), exist_ok=True)
+
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 log = logging.getLogger("nex-bot")
 
@@ -59,6 +64,24 @@ async def call_nex(path, params):
 
 # ---------- Command handlers ----------
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Save the chat ID for the revenue monitor
+    chat_id = update.message.chat_id
+    user = update.message.from_user
+    users = {}
+    if _os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE) as f:
+                users = json.load(f)
+        except Exception:
+            pass
+    users[str(chat_id)] = {
+        "first_name": user.first_name if user else "?",
+        "username": user.username if user else None,
+        "first_seen": users.get(str(chat_id), {}).get("first_seen", str(chat_id)),
+        "last_seen": str(chat_id),
+    }
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f, indent=2)
     msg = (
         f"👋 *{NEX_COMPANY} Telegram Bot*\n\n"
         "I route your messages to NEX's 25 x402 paid services — for free, "
@@ -72,6 +95,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/ens <name>` — ENS name → address\n"
         "• `/hacks [chain]` — recent crypto exploits (default 10)\n"
         "• `/pay` — how to use NEX x402 paid endpoints\n"
+        "• `/price BTC` — quick crypto price lookup\n"
+        "• `/research <topic>` — AI-powered research (1M context)\n"
         "• Just send a message — defaults to chat\n\n"
         f"_All endpoints also at: {NEX_X402_BASE}_\n"
         f"_Bazaar (28K x402 services): https://nexaitechau.github.io/x402bazaar.com/_\n"
@@ -236,6 +261,44 @@ async def cmd_hacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"• *${h.get('amount_millions', '?')}M* — {h.get('name', '?')[:30]} ({chains[:15]})\n  _{h.get('technique', '?')[:60]}_\n"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
+async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Quick crypto price lookup via NEX x402."""
+    if not context.args:
+        await update.message.reply_text("Usage: /price BTC or /price BTC,ETH,SOL")
+        return
+    symbol = context.args[0]
+    r = await call_nex("/v1/free/crypto-price", {"symbol": symbol})
+    if r.get("ok") is False:
+        await update.message.reply_text(f"Error: {r.get('error', 'unknown')}")
+        return
+    data = r.get("data", {})
+    if not data:
+        await update.message.reply_text(f"No data for {symbol}")
+        return
+    msg = f"💰 *Crypto Prices* (`{symbol}`)\n\n"
+    for token_id, info in data.items():
+        usd = info.get("usd")
+        if usd:
+            msg += f"• *{token_id.upper()}*: ${usd:,.4f}\n"
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """AI research using NEX (uses NEMOTRON 30B with 1M context)."""
+    if not context.args:
+        await update.message.reply_text("Usage: /research <topic or question>")
+        return
+    topic = " ".join(context.args)
+    prompt = f"Research this topic and provide a concise 3-paragraph analysis with key facts: {topic}"
+    await update.message.reply_text("Researching... (nemotron-3.5 30B, 1M context)")
+    r = await call_nex("/v1/free/chat", {"prompt": prompt})
+    if r.get("ok") is False:
+        await update.message.reply_text(f"Error: {r.get('error', 'unknown')}")
+        return
+    reply = r.get("message", {}).get("content") or r.get("reply") or json.dumps(r, indent=2)
+    if len(reply) > 4000:
+        reply = reply[:4000] + "\n\n[truncated]"
+    await update.message.reply_text(reply)
+
 async def cmd_pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         f"💰 *Use NEX x402 Paid Endpoints*\n\n"
@@ -275,6 +338,8 @@ def main():
     app.add_handler(CommandHandler("ens", cmd_ens))
     app.add_handler(CommandHandler("hacks", cmd_hacks))
     app.add_handler(CommandHandler("pay", cmd_pay))
+    app.add_handler(CommandHandler("price", cmd_price))
+    app.add_handler(CommandHandler("research", cmd_research))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     log.info("Bot is polling. Send /start to test.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
