@@ -8,7 +8,7 @@ Paid tier: user pays x402 USDC directly
 Setup:
   1. Talk to @BotFather on Telegram, get a bot token
   2. export NEX_BOT_TOKEN=<token from BotFather>
-  3. export NEX_X402_BASE=https://charm-preparing-avon-ips.trycloudflare.com
+  3. export NEX_X402_BASE=https://scsi-ids-fin-farmers.trycloudflare.com
   4. python3 bot.py
 
 Usage in Telegram:
@@ -36,7 +36,7 @@ NEX_BOT_TOKEN = os.environ.get("NEX_BOT_TOKEN")
 if not NEX_BOT_TOKEN:
     raise SystemExit("Set NEX_BOT_TOKEN env var (get one from @BotFather)")
 
-NEX_X402_BASE = os.environ.get("NEX_X402_BASE", "https://charm-preparing-avon-ips.trycloudflare.com")
+NEX_X402_BASE = os.environ.get("NEX_X402_BASE", "https://scsi-ids-fin-farmers.trycloudflare.com")
 NEX_WALLET = "0x28F3D3fb24D4926BF5C35296c822d2a43D181177"
 NEX_COMPANY = "NEX Agent Co."
 

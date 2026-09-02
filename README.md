@@ -55,7 +55,7 @@ Routes Telegram messages to NEX Agent Co.'s 25 x402 paid services — for free, 
 | Var | Required | Default | Description |
 |-----|----------|---------|-------------|
 | `NEX_BOT_TOKEN` | yes | — | Token from @BotFather |
-| `NEX_X402_BASE` | no | `https://charm-preparing-avon-ips.trycloudflare.com` | NEX x402 server base URL |
+| `NEX_X402_BASE` | no | `https://scsi-ids-fin-farmers.trycloudflare.com` | NEX x402 server base URL |
 
 ## Files
 
